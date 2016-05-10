@@ -40,31 +40,9 @@
 #define LMGCDAsyncSocketMiddlewareEyeBallsUncachedDelay   0.300f
 #define LMGCDAsyncSocketMiddlewareEyeBallsCachedDelay     2.000f
 
-
 // Logging
-#import "DDLog.h"
-
-#define LogAsync   YES
-#define LogContext GCDAsyncSocketLoggingContext
-
-#define LogObjc(flg, frmt, ...) LOG_OBJC_MAYBE(LogAsync, logLevel, flg, LogContext, frmt, ##__VA_ARGS__)
-#define LogC(flg, frmt, ...)    LOG_C_MAYBE(LogAsync, logLevel, flg, LogContext, frmt, ##__VA_ARGS__)
-
-#define LogError(frmt, ...)     LogObjc(LOG_FLAG_ERROR,   (@"%@: " frmt), THIS_FILE, ##__VA_ARGS__)
-#define LogWarn(frmt, ...)      LogObjc(LOG_FLAG_WARN,    (@"%@: " frmt), THIS_FILE, ##__VA_ARGS__)
-#define LogInfo(frmt, ...)      LogObjc(LOG_FLAG_INFO,    (@"%@: " frmt), THIS_FILE, ##__VA_ARGS__)
-#define LogVerbose(frmt, ...)   LogObjc(LOG_FLAG_VERBOSE, (@"%@: " frmt), THIS_FILE, ##__VA_ARGS__)
-
-#define LogCError(frmt, ...)    LogC(LOG_FLAG_ERROR,   (@"%@: " frmt), THIS_FILE, ##__VA_ARGS__)
-#define LogCWarn(frmt, ...)     LogC(LOG_FLAG_WARN,    (@"%@: " frmt), THIS_FILE, ##__VA_ARGS__)
-#define LogCInfo(frmt, ...)     LogC(LOG_FLAG_INFO,    (@"%@: " frmt), THIS_FILE, ##__VA_ARGS__)
-#define LogCVerbose(frmt, ...)  LogC(LOG_FLAG_VERBOSE, (@"%@: " frmt), THIS_FILE, ##__VA_ARGS__)
-
-#define LogTrace()              LogObjc(LOG_FLAG_VERBOSE, @"%@: %@", THIS_FILE, THIS_METHOD)
-#define LogCTrace()             LogC(LOG_FLAG_VERBOSE, @"%@: %s", THIS_FILE, __FUNCTION__)
-
-static const int logLevel = DDLogLevelWarning;
-
+#import "CocoaLumberjack.h"
+static const int LOG_LEVEL_DEF = DDLogLevelWarning;
 
 const char* LMGCDAsyncSocketMiddlewareSocketQueue = "com.luckymarmot.LMGCDAsyncSocketMiddlewareSocketQueue";
 static NSCache* _cachedAddresses;
@@ -226,7 +204,7 @@ typedef NS_ENUM (NSUInteger, LMGCDAsyncSocketStatus) {
 
     // if we still got no response yet, retry with 2nd address
     if (shouldConnect) {
-        LogInfo(@"No response on preferred address ~> trying '%@'...", [GCDAsyncSocket hostFromAddress:_alternateAddress]);
+        DDLogInfo(@"No response on preferred address ~> trying '%@'...", [GCDAsyncSocket hostFromAddress:_alternateAddress]);
 
         /* connect to the alternate socket, if connected or
          * disconnected (cancelled) before, this will be nil and
@@ -253,7 +231,7 @@ typedef NS_ENUM (NSUInteger, LMGCDAsyncSocketStatus) {
 
 - (BOOL)connectToHost:(NSString*)host onPort:(uint16_t)port error:(NSError* __autoreleasing*)__error
 {
-    LogInfo(@"Connect to Host: %@ port: %d", host, port);
+    DDLogInfo(@"Connect to Host: %@ port: %d", host, port);
 
     // Perform DNS Lookup
     NSData* IPv4Address = nil;
@@ -279,17 +257,17 @@ typedef NS_ENUM (NSUInteger, LMGCDAsyncSocketStatus) {
         if (preferredAddress != nil) {
             if ([GCDAsyncSocket hostFromAddress:preferredAddress] != nil) {
                 eyeBallsDelay = LMGCDAsyncSocketMiddlewareEyeBallsCachedDelay;
-                LogInfo(@"Multiple addresses available (preferred from cache: %@)", [GCDAsyncSocket hostFromAddress:preferredAddress]);
+                DDLogInfo(@"Multiple addresses available (preferred from cache: %@)", [GCDAsyncSocket hostFromAddress:preferredAddress]);
             }
             else {
-                LogInfo(@"Preferred address is cached, but it's invalid - discarding it.");
+                DDLogInfo(@"Preferred address is cached, but it's invalid - discarding it.");
                 preferredAddress = nil;
             }
         }
     }
     if (preferredAddress == nil) {
         preferredAddress = IPv4Address != nil ? IPv4Address : IPv6Address;
-        LogInfo(@"%@ address(es) available (preferred: %@)", ((IPv4Address != nil && IPv6Address != nil) ? @"Multiple" : @"One"), [GCDAsyncSocket hostFromAddress:preferredAddress]);
+        DDLogInfo(@"%@ address(es) available (preferred: %@)", ((IPv4Address != nil && IPv6Address != nil) ? @"Multiple" : @"One"), [GCDAsyncSocket hostFromAddress:preferredAddress]);
     }
 
     // Connect to 2nd address, after delay
@@ -304,7 +282,7 @@ typedef NS_ENUM (NSUInteger, LMGCDAsyncSocketStatus) {
 
 - (void)startTLS:(NSDictionary*)tlsSettings
 {
-    LogTrace();
+    DDLogVerbose(@"clearDelegateAndDisconnect");
 
     [(_socketIPv4 ?: _socketIPv6) startTLS:tlsSettings];
 }
@@ -322,7 +300,7 @@ typedef NS_ENUM (NSUInteger, LMGCDAsyncSocketStatus) {
 
         // If completed, call delegate remove read operation
         if (completed) {
-            LogVerbose(@"Completed Read Operation: %@", readOperation);
+            DDLogVerbose(@"Completed Read Operation: %@", readOperation);
 
             // Remove Read Operation (Must be before we call the delegate)
             [_readOperations removeObjectAtIndex:0];
@@ -332,7 +310,7 @@ typedef NS_ENUM (NSUInteger, LMGCDAsyncSocketStatus) {
         }
         // If not completed, read more
         else {
-            LogVerbose(@"Read Operation Not Yet Completed: %@", NSStringFromClass([readOperation class]));
+            DDLogVerbose(@"Read Operation Not Yet Completed: %@", NSStringFromClass([readOperation class]));
 
             // Call Delegate if New Data
             if (newDataLength >= 0) {
@@ -354,18 +332,18 @@ typedef NS_ENUM (NSUInteger, LMGCDAsyncSocketStatus) {
 {
     // Run on _delegateQueue no matter what
     if (dispatch_get_specific(_delegateQueueSpecificIvar) != NULL) {
-        LogVerbose(@"Run Block directly on Delegate Queue");
+        DDLogVerbose(@"Run Block directly on Delegate Queue");
         block();
     }
     else {
-        LogVerbose(@"Run Block synchronously on Delegate Queue");
+        DDLogVerbose(@"Run Block synchronously on Delegate Queue");
         dispatch_sync(_delegateQueue, block);
     }
 }
 
 - (void)readDataToData:(NSData*)data buffer:(NSMutableData*)buffer tag:(NSUInteger)tag
 {
-    LogVerbose(@"Queue Read-To-Data (buffer length: %@)", buffer ? @(buffer.length) : @"no buffer");
+    DDLogVerbose(@"Queue Read-To-Data (buffer length: %@)", buffer ? @(buffer.length) : @"no buffer");
 
     LMGCDAsyncSocketReadOperation* readOperation = [[LMGCDAsyncSocketToDataReadOperation alloc] initWithData:data buffer:buffer tag:tag];
 
@@ -377,7 +355,7 @@ typedef NS_ENUM (NSUInteger, LMGCDAsyncSocketStatus) {
 
 - (void)readDataToLength:(NSUInteger)length buffer:(NSMutableData*)buffer tag:(NSUInteger)tag
 {
-    LogVerbose(@"Queue Read-To-Length: %ld (buffer length: %@)", (unsigned long)length, buffer ? @(buffer.length) : @"no buffer");
+    DDLogVerbose(@"Queue Read-To-Length: %ld (buffer length: %@)", (unsigned long)length, buffer ? @(buffer.length) : @"no buffer");
 
     LMGCDAsyncSocketReadOperation* readOperation = [[LMGCDAsyncSocketToLengthReadOperation alloc] initWithLength:length buffer:buffer tag:tag];
 
@@ -389,7 +367,7 @@ typedef NS_ENUM (NSUInteger, LMGCDAsyncSocketStatus) {
 
 - (void)readDataUntilCloseWithBuffer:(NSMutableData*)buffer tag:(NSUInteger)tag
 {
-    LogVerbose(@"Queue Read-To-EOF (buffer length: %@)", buffer ? @(buffer.length) : @"no buffer");
+    DDLogVerbose(@"Queue Read-To-EOF (buffer length: %@)", buffer ? @(buffer.length) : @"no buffer");
 
     LMGCDAsyncSocketReadOperation* readOperation = [[LMGCDAsyncSocketToEOFReadOperation alloc] initWithBuffer:buffer tag:tag];
 
@@ -403,7 +381,7 @@ typedef NS_ENUM (NSUInteger, LMGCDAsyncSocketStatus) {
 
 - (void)writeData:(NSData*)data tag:(NSUInteger)tag
 {
-    LogVerbose(@"Write data length: %ld tag: %ld", (unsigned long)data.length, tag);
+    DDLogVerbose(@"Write data length: %ld tag: %ld", (unsigned long)data.length, (unsigned long)tag);
 
     [(_socketIPv4 ?: _socketIPv6) writeData:data withTimeout:LMGCDAsyncSocketMiddlewareNoTimeout tag:tag];
 }
@@ -412,7 +390,7 @@ typedef NS_ENUM (NSUInteger, LMGCDAsyncSocketStatus) {
 
 - (void)clearDelegateAndDisconnect
 {
-    LogTrace();
+    DDLogVerbose(@"clearDelegateAndDisconnect");
 
     _delegate = nil;
     _delegateQueue = NULL;
@@ -479,7 +457,7 @@ typedef NS_ENUM (NSUInteger, LMGCDAsyncSocketStatus) {
     dispatch_async(queue, ^{
         [socket setDelegate:nil delegateQueue:NULL];
         [socket disconnect];
-        LogVerbose(@"Disconnected unused socket");
+        DDLogVerbose(@"Disconnected unused socket");
     });
 }
 
@@ -489,7 +467,7 @@ typedef NS_ENUM (NSUInteger, LMGCDAsyncSocketStatus) {
 
 - (void)socket:(GCDAsyncSocket*)sock didConnectToHost:(NSString*)host port:(uint16_t)port
 {
-    LogVerbose(@"socket:didConnectToHost:%@ port:%d", host, port);
+    DDLogVerbose(@"socket:didConnectToHost:%@ port:%d", host, port);
 
     BOOL didConnect = NO;
 
@@ -497,7 +475,7 @@ typedef NS_ENUM (NSUInteger, LMGCDAsyncSocketStatus) {
         _socketIPv4Status == LMGCDAsyncSocketStatusConnecting &&
         _socketIPv6Status != LMGCDAsyncSocketStatusConnected &&
         _socketIPv6Status != LMGCDAsyncSocketStatusDisconnectedAfterConnect) {
-        LogInfo(@"Connected to %@ with IPv4 socket", host);
+        DDLogInfo(@"Connected to %@ with IPv4 socket", host);
         _socketIPv4Status = LMGCDAsyncSocketStatusConnected;
         didConnect = YES;
 
@@ -513,7 +491,7 @@ typedef NS_ENUM (NSUInteger, LMGCDAsyncSocketStatus) {
              _socketIPv6Status == LMGCDAsyncSocketStatusConnecting &&
              _socketIPv4Status != LMGCDAsyncSocketStatusConnected &&
              _socketIPv4Status != LMGCDAsyncSocketStatusDisconnectedAfterConnect) {
-        LogInfo(@"Connected to %@ with IPv6 socket", host);
+        DDLogInfo(@"Connected to %@ with IPv6 socket", host);
         _socketIPv6Status = LMGCDAsyncSocketStatusConnected;
         didConnect = YES;
 
@@ -548,7 +526,7 @@ typedef NS_ENUM (NSUInteger, LMGCDAsyncSocketStatus) {
 
 - (void)socket:(GCDAsyncSocket*)sock didReadData:(NSData*)data withTag:(long)tag
 {
-    LogVerbose(@"Received Data from Socket (length: %ld)", (unsigned long)data.length);
+    DDLogVerbose(@"Received Data from Socket (length: %ld)", (unsigned long)data.length);
 
     [_readPrebuffer appendData:data];
     [self _processRead:data.length completionType:LMGCDAsyncSocketReadOperationCompletionTypeRead];
@@ -565,11 +543,11 @@ typedef NS_ENUM (NSUInteger, LMGCDAsyncSocketStatus) {
 
     if (sock == _socketIPv4) {
         if (_socketIPv4Status == LMGCDAsyncSocketStatusConnected) {
-            LogVerbose(@"[IPv4] Remote server closed the connection: %@", err.localizedDescription);
+            DDLogVerbose(@"[IPv4] Remote server closed the connection: %@", err.localizedDescription);
             _socketIPv4Status = LMGCDAsyncSocketStatusDisconnectedAfterConnect;
         }
         else if (_socketIPv4Status != LMGCDAsyncSocketStatusIdle) {
-            LogVerbose(@"[IPv4] Couldn't connect to the server: %@", err.localizedDescription);
+            DDLogVerbose(@"[IPv4] Couldn't connect to the server: %@", err.localizedDescription);
             _socketIPv4Status = LMGCDAsyncSocketStatusDisconnectedConnectionFailed;
         }
 
@@ -579,11 +557,11 @@ typedef NS_ENUM (NSUInteger, LMGCDAsyncSocketStatus) {
     }
     else {
         if (_socketIPv6Status == LMGCDAsyncSocketStatusConnected) {
-            LogVerbose(@"[IPv6] Remote server closed the connection: %@", err.localizedDescription);
+            DDLogVerbose(@"[IPv6] Remote server closed the connection: %@", err.localizedDescription);
             _socketIPv6Status = LMGCDAsyncSocketStatusDisconnectedAfterConnect;
         }
         else if (_socketIPv6Status != LMGCDAsyncSocketStatusIdle) {
-            LogVerbose(@"[IPv6] Couldn't connect to the server: %@", err.localizedDescription);
+            DDLogVerbose(@"[IPv6] Couldn't connect to the server: %@", err.localizedDescription);
             _socketIPv6Status = LMGCDAsyncSocketStatusDisconnectedConnectionFailed;
         }
 
