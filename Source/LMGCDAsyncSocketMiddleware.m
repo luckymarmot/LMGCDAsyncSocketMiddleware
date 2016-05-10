@@ -66,7 +66,7 @@
 static const int logLevel = DDLogLevelWarning;
 
 
-const char* LMGCDAsyncSocketMiddlewareSocketQueue = "com.luckymarmot.Paw.LMGCDAsyncSocketMiddlewareSocketQueue";
+const char* LMGCDAsyncSocketMiddlewareSocketQueue = "com.luckymarmot.LMGCDAsyncSocketMiddlewareSocketQueue";
 static NSCache* _cachedAddresses;
 
 typedef NS_ENUM (NSUInteger, LMGCDAsyncSocketStatus) {
@@ -315,10 +315,10 @@ typedef NS_ENUM (NSUInteger, LMGCDAsyncSocketStatus) {
 - (void)_processRead:(NSInteger)newDataLength completionType:(LMGCDAsyncSocketReadOperationCompletionType)completionType
 {
     // Until we have both data in prebuffer and read operations pending
-    while ([_readPrebuffer length] > 0 && [_readOperations count] > 0) {
-        LMGCDAsyncSocketReadOperation* readOperation = [_readOperations firstObject];
+    while (_readPrebuffer.length > 0 && _readOperations.count > 0) {
+        LMGCDAsyncSocketReadOperation* readOperation = _readOperations.firstObject;
         BOOL completed = [readOperation completeOperationWithPrebuffer:_readPrebuffer completionType:completionType];
-        NSRange rangeReadInBuffer = NSMakeRange(readOperation.initialBufferLength, [readOperation.buffer length] - readOperation.initialBufferLength);
+        NSRange rangeReadInBuffer = NSMakeRange(readOperation.initialBufferLength, readOperation.buffer.length - readOperation.initialBufferLength);
 
         // If completed, call delegate remove read operation
         if (completed) {
@@ -336,7 +336,7 @@ typedef NS_ENUM (NSUInteger, LMGCDAsyncSocketStatus) {
 
             // Call Delegate if New Data
             if (newDataLength >= 0) {
-                [self.delegate socketMiddleware:self didReadPartialDataOfLength:newDataLength totalBytesRead:[_readPrebuffer length] tag:readOperation.tag];
+                [self.delegate socketMiddleware:self didReadPartialDataOfLength:newDataLength totalBytesRead:_readPrebuffer.length tag:readOperation.tag];
             }
 
             break;
@@ -365,7 +365,7 @@ typedef NS_ENUM (NSUInteger, LMGCDAsyncSocketStatus) {
 
 - (void)readDataToData:(NSData*)data buffer:(NSMutableData*)buffer tag:(NSUInteger)tag
 {
-    LogVerbose(@"Queue Read-To-Data (buffer length: %@)", buffer ? @([buffer length]) : @"no buffer");
+    LogVerbose(@"Queue Read-To-Data (buffer length: %@)", buffer ? @(buffer.length) : @"no buffer");
 
     LMGCDAsyncSocketReadOperation* readOperation = [[LMGCDAsyncSocketToDataReadOperation alloc] initWithData:data buffer:buffer tag:tag];
 
@@ -377,7 +377,7 @@ typedef NS_ENUM (NSUInteger, LMGCDAsyncSocketStatus) {
 
 - (void)readDataToLength:(NSUInteger)length buffer:(NSMutableData*)buffer tag:(NSUInteger)tag
 {
-    LogVerbose(@"Queue Read-To-Length: %ld (buffer length: %@)", length, buffer ? @([buffer length]) : @"no buffer");
+    LogVerbose(@"Queue Read-To-Length: %ld (buffer length: %@)", (unsigned long)length, buffer ? @(buffer.length) : @"no buffer");
 
     LMGCDAsyncSocketReadOperation* readOperation = [[LMGCDAsyncSocketToLengthReadOperation alloc] initWithLength:length buffer:buffer tag:tag];
 
@@ -389,7 +389,7 @@ typedef NS_ENUM (NSUInteger, LMGCDAsyncSocketStatus) {
 
 - (void)readDataUntilCloseWithBuffer:(NSMutableData*)buffer tag:(NSUInteger)tag
 {
-    LogVerbose(@"Queue Read-To-EOF (buffer length: %@)", buffer ? @([buffer length]) : @"no buffer");
+    LogVerbose(@"Queue Read-To-EOF (buffer length: %@)", buffer ? @(buffer.length) : @"no buffer");
 
     LMGCDAsyncSocketReadOperation* readOperation = [[LMGCDAsyncSocketToEOFReadOperation alloc] initWithBuffer:buffer tag:tag];
 
@@ -403,7 +403,7 @@ typedef NS_ENUM (NSUInteger, LMGCDAsyncSocketStatus) {
 
 - (void)writeData:(NSData*)data tag:(NSUInteger)tag
 {
-    LogVerbose(@"Write data length: %ld tag: %ld", [data length], tag);
+    LogVerbose(@"Write data length: %ld tag: %ld", (unsigned long)data.length, tag);
 
     [(_socketIPv4 ?: _socketIPv6) writeData:data withTimeout:LMGCDAsyncSocketMiddlewareNoTimeout tag:tag];
 }
@@ -548,10 +548,10 @@ typedef NS_ENUM (NSUInteger, LMGCDAsyncSocketStatus) {
 
 - (void)socket:(GCDAsyncSocket*)sock didReadData:(NSData*)data withTag:(long)tag
 {
-    LogVerbose(@"Received Data from Socket (length: %ld)", [data length]);
+    LogVerbose(@"Received Data from Socket (length: %ld)", (unsigned long)data.length);
 
     [_readPrebuffer appendData:data];
-    [self _processRead:[data length] completionType:LMGCDAsyncSocketReadOperationCompletionTypeRead];
+    [self _processRead:data.length completionType:LMGCDAsyncSocketReadOperationCompletionTypeRead];
 }
 
 - (void)socket:(GCDAsyncSocket*)sock didWriteDataWithTag:(long)tag
