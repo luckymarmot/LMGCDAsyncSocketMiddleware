@@ -13,4 +13,4 @@ A middleware for CocoaAsyncSocket's TCP GCDAsyncSocket.
 
 ## License
 
-Copyright 2016 [Paw](https://luckymarmot.com/paw). MIT License. See LICENSE.md.
+Copyright 2016 [Paw](https://luckymarmot.com/paw). MIT License. See [LICENSE](LICENSE).
